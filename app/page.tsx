@@ -2,33 +2,30 @@
 import { useState, useEffect } from 'react';
 import { astrolabe } from 'iztro';
 
-// 1. 定义档案数据结构
 interface Profile {
   id: string;
   name: string;
   gender: 'male' | 'female';
-  solarDate: string; // 格式: YYYY-MM-DD
-  timeIndex: number; // 时辰索引 (0-12)
+  solarDate: string;
+  timeIndex: number;
 }
 
 export default function Home() {
-  // 档案列表状态
+  const [mounted, setMounted] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([
     { id: '1', name: '自己', gender: 'male', solarDate: '1995-08-18', timeIndex: 4 }
   ]);
   const [currentId, setCurrentId] = useState<string>('1');
-  
-  // 目标查询时间（用于看流年/流月/流日）
   const [targetDate, setTargetDate] = useState<string>('2026-11-05');
 
-  // 新增档案表单状态
   const [newName, setNewName] = useState('');
   const [newDate, setNewDate] = useState('2000-01-01');
   const [newGender, setNewGender] = useState<'male' | 'female'>('male');
   const [newTimeIndex, setNewTimeIndex] = useState(0);
 
-  // 初始化：从浏览器的 localStorage 读取保存的档案
+  // 确保只在客户端加载 localStorage 和 iztro
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem('yizi_profiles');
     if (saved) {
       try {
@@ -43,13 +40,15 @@ export default function Home() {
     }
   }, []);
 
-  // 保存档案到 localStorage
+  if (!mounted) {
+    return <div className="min-h-screen bg-slate-900 text-slate-100 p-8 flex items-center justify-center">加载中...</div>;
+  }
+
   const saveProfilesToStorage = (newProfiles: Profile[]) => {
     setProfiles(newProfiles);
     localStorage.setItem('yizi_profiles', JSON.stringify(newProfiles));
   };
 
-  // 添加新档案
   const handleAddProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -66,18 +65,25 @@ export default function Home() {
     setNewName('');
   };
 
-  // 获取当前选中的档案
   const currentProfile = profiles.find(p => p.id === currentId) || profiles[0];
 
-  // 2. 调用 iztro 计算本命盘与流盘数据
-  const astrolabeData = astrolabe.bySolar(
-    currentProfile.solarDate, 
-    currentProfile.timeIndex, 
-    currentProfile.gender, 
-    true, 
-    'zh-CN'
-  );
-  const horoscope = astrolabeData.horoscope(targetDate);
+  // 安全调用 iztro 排盘
+  let astrolabeData: any = null;
+  let horoscope: any = null;
+  try {
+    if (astrolabe && typeof astrolabe.bySolar === 'function') {
+      astrolabeData = astrolabe.bySolar(
+        currentProfile.solarDate, 
+        currentProfile.timeIndex, 
+        currentProfile.gender, 
+        true, 
+        'zh-CN'
+      );
+      horoscope = astrolabeData.horoscope(targetDate);
+    }
+  } catch (error) {
+    console.error("排盘计算出错:", error);
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8">
@@ -90,7 +96,6 @@ export default function Home() {
             <p className="text-xs text-slate-400">多档案紫微斗数动态流盘系统</p>
           </div>
 
-          {/* 档案选择下拉框 */}
           <div className="flex items-center gap-3">
             <label className="text-sm text-slate-300">当前档案:</label>
             <select 
@@ -105,10 +110,8 @@ export default function Home() {
           </div>
         </header>
 
-        {/* 控制面板：流盘时间切换 & 添加档案 */}
+        {/* 控制面板 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* 流盘时间选择 */}
           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-md">
             <h2 className="text-md font-semibold mb-3 text-purple-300">⏳ 动态时空切换 (流年/流月/流日)</h2>
             <div className="space-y-3">
@@ -121,14 +124,15 @@ export default function Home() {
                   className="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-white"
                 />
               </div>
-              <div className="text-xs text-slate-300 flex justify-between bg-slate-900/50 p-3 rounded-lg">
-                <span>🐉 流年: <strong className="text-purple-400">{horoscope.year.heavenlyStem}{horoscope.year.earthlyBranch}年 ({horoscope.year.palaceName})</strong></span>
-                <span>🌙 流月: <strong className="text-blue-400">{horoscope.month.palaceName}</strong></span>
-              </div>
+              {horoscope && (
+                <div className="text-xs text-slate-300 flex justify-between bg-slate-900/50 p-3 rounded-lg">
+                  <span>🐉 流年: <strong className="text-purple-400">{horoscope.year.heavenlyStem}{horoscope.year.earthlyBranch}年 ({horoscope.year.palaceName})</strong></span>
+                  <span>🌙 流月: <strong className="text-blue-400">{horoscope.month.palaceName}</strong></span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* 添加新档案表单 */}
           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-md">
             <h2 className="text-md font-semibold mb-3 text-purple-300">➕ 添加新亲友档案</h2>
             <form onSubmit={handleAddProfile} className="space-y-2">
@@ -171,48 +175,45 @@ export default function Home() {
               </button>
             </form>
           </div>
-
         </div>
 
-        {/* 3. 十二宫格排盘主界面 */}
-        <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl">
-          <h2 className="text-lg font-bold mb-4 text-purple-300 flex items-center justify-between">
-            <span>✨ 紫微斗数十二宫格盘面</span>
-            <span className="text-xs font-normal text-slate-400">命主: {currentProfile.name} | 五行局: {astrolabeData.fiveElements局}</span>
-          </h2>
+        {/* 十二宫格排盘主界面 */}
+        {astrolabeData && (
+          <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl">
+            <h2 className="text-lg font-bold mb-4 text-purple-300 flex items-center justify-between">
+              <span>✨ 紫微斗数十二宫格盘面</span>
+              <span className="text-xs font-normal text-slate-400">命主: {currentProfile.name} | 五行局: {astrolabeData.fiveElements局}</span>
+            </h2>
 
-          {/* 经典宫位网格 (4x4 布局模拟十二宫) */}
-          <div className="grid grid-cols-4 gap-2">
-            {astrolabeData.palaces.map((palace, index) => (
-              <div 
-                key={index}
-                className="bg-slate-900 border border-slate-700/80 p-3 rounded-xl min-h-[130px] flex flex-col justify-between hover:border-purple-500 transition"
-              >
-                {/* 宫位头部：宫名与地支 */}
-                <div className="flex justify-between items-center border-b border-slate-800 pb-1">
-                  <span className="font-bold text-sm text-purple-400">{palace.name}</span>
-                  <span className="text-xs text-slate-500">{palace.earthlyBranch}</span>
-                </div>
-
-                {/* 宫内星曜显示 */}
-                <div className="py-1 space-y-1 flex-1">
-                  <div className="text-xs text-amber-300 font-medium truncate">
-                    {palace.majorStars.map(s => s.name).join(' ')}
+            <div className="grid grid-cols-4 gap-2">
+              {astrolabeData.palaces.map((palace: any, index: number) => (
+                <div 
+                  key={index}
+                  className="bg-slate-900 border border-slate-700/80 p-3 rounded-xl min-h-[130px] flex flex-col justify-between hover:border-purple-500 transition"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-1">
+                    <span className="font-bold text-sm text-purple-400">{palace.name}</span>
+                    <span className="text-xs text-slate-500">{palace.earthlyBranch}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate">
-                    {palace.minorStars.map(s => s.name).join(' ')}
+
+                  <div className="py-1 space-y-1 flex-1">
+                    <div className="text-xs text-amber-300 font-medium truncate">
+                      {palace.majorStars.map((s: any) => s.name).join(' ')}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {palace.minorStars.map((s: any) => s.name).join(' ')}
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-slate-500 flex justify-between pt-1 border-t border-slate-800/50">
+                    <span>{palace.ages.join('-')}岁</span>
+                    <span className="text-slate-400">{palace.heavenlyStem}</span>
                   </div>
                 </div>
-
-                {/* 宫位底部：岁限信息 */}
-                <div className="text-[10px] text-slate-500 flex justify-between pt-1 border-t border-slate-800/50">
-                  <span>{palace.ages.join('-')}岁</span>
-                  <span className="text-slate-400">{palace.heavenlyStem}</span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>
