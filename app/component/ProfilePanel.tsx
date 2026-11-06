@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import type { T } from '../lib/i18n';
 
 export interface Profile {
   id: string;
@@ -15,6 +16,7 @@ interface ProfilePanelProps {
   onSelectProfile: (id: string) => void;
   onSaveProfile: (profile: Profile, isEditing: boolean) => void;
   onDeleteProfile: (id: string) => void;
+  t: T;
 }
 
 export default function ProfilePanel({
@@ -23,6 +25,7 @@ export default function ProfilePanel({
   onSelectProfile,
   onSaveProfile,
   onDeleteProfile,
+  t,
 }: ProfilePanelProps) {
   const currentProfile = profiles.find(p => p.id === currentId) || profiles[0];
 
@@ -63,12 +66,12 @@ export default function ProfilePanel({
       {/* 档案切换头部 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-md font-semibold text-purple-300">👤 档案管理</h2>
-          <p className="text-xs text-slate-400">切换或管理您的亲友紫微命盘档案</p>
+          <h2 className="text-md font-semibold text-purple-300">{t('profilesTitle')}</h2>
+          <p className="text-xs text-slate-400">{t('profilesSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select 
-            value={currentId} 
+          <select
+            value={currentId}
             onChange={(e) => onSelectProfile(e.target.value)}
             className="bg-slate-900 border border-slate-700 text-white px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto focus:outline-none focus:border-purple-500"
           >
@@ -83,23 +86,23 @@ export default function ProfilePanel({
       <div className="border-t border-slate-700/60 pt-3">
         <div className="flex justify-between items-center mb-2">
           <span className="text-xs font-medium text-slate-300">
-            {isEditing ? `✏️ 修改当前档案: ${currentProfile?.name}` : '➕ 添加新档案'}
+            {isEditing ? `${t('editingProfile')}: ${currentProfile?.name}` : t('addNew')}
           </span>
           <div className="space-x-2">
             {!isEditing && (
-              <button 
+              <button
                 onClick={() => setIsEditing(true)}
                 className="text-xs bg-blue-600/80 hover:bg-blue-500 px-2 py-1 rounded transition"
               >
-                修改当前
+                {t('editCurrent')}
               </button>
             )}
             {isEditing && (
-              <button 
+              <button
                 onClick={() => setIsEditing(false)}
                 className="text-xs bg-slate-600 hover:bg-slate-500 px-2 py-1 rounded transition"
               >
-                取消
+                {t('cancel')}
               </button>
             )}
           </div>
@@ -107,50 +110,50 @@ export default function ProfilePanel({
 
         <form onSubmit={handleSubmit} className="space-y-2">
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="姓名" 
+            <input
+              type="text"
+              placeholder={t('namePlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               className="flex-1 bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white"
             />
-            <select 
-              value={newGender} 
+            <select
+              value={newGender}
               onChange={(e) => setNewGender(e.target.value as 'male' | 'female')}
               className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white"
             >
-              <option value="male">男</option>
-              <option value="female">女</option>
+              <option value="male">{t('genderMale')}</option>
+              <option value="female">{t('genderFemale')}</option>
             </select>
           </div>
           <div className="flex gap-2">
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
               className="flex-1 bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white"
             />
-            <select 
+            <select
               value={newTimeIndex}
               onChange={(e) => setNewTimeIndex(Number(e.target.value))}
               className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white"
             >
-              {Array.from({ length: 13 }).map((_, i) => (
-                <option key={i} value={i}>时辰索引 {i}</option>
+              {t.hours.map((label, i) => (
+                <option key={i} value={i}>{label}</option>
               ))}
             </select>
           </div>
           <div className="flex gap-2 pt-1">
             <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-1.5 rounded-lg text-sm font-medium transition">
-              {isEditing ? '保存修改' : '确认添加'}
+              {isEditing ? t('saveEdit') : t('confirmAdd')}
             </button>
             {isEditing && (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => onDeleteProfile(currentId)}
                 className="bg-red-600/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm transition"
               >
-                删除
+                {t('delete')}
               </button>
             )}
           </div>

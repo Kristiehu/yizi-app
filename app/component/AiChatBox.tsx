@@ -1,132 +1,139 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { astrolabe } from 'iztro';
-import ProfilePanel, { Profile } from './components/ProfilePanel';
-import HoroscopeBar from './components/HoroscopeBar';
-import AstrolabeGrid from './components/AstrolabeGrid';
-import AiChatBox from './components/AiChatBox';
+import { useState } from 'react';
+import type { IFunctionalAstrolabe } from 'iztro/lib/astro/FunctionalAstrolabe';
+import type { IFunctionalHoroscope } from 'iztro/lib/astro/FunctionalHoroscope';
+import type { Profile } from './ProfilePanel';
+import type { T } from '../lib/i18n';
 
-export default function Home() {
-  const [mounted, setMounted] = useState(false);
-  const [profiles, setProfiles] = useState<Profile[]>([
-    { id: '1', name: '自己', gender: 'male', solarDate: '1995-08-18', timeIndex: 4 }
-  ]);
-  const [currentId, setCurrentId] = useState<string>('1');
-  const [targetDate, setTargetDate] = useState<string>('2026-11-05');
+interface AiChatBoxProps {
+  currentProfile: Profile;
+  targetDate: string;
+  horoscope: IFunctionalHoroscope | null;
+  astrolabeData: IFunctionalAstrolabe | null;
+  t: T;
+}
 
-  // 初始化加载本地档案
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('yizi_profiles');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length > 0) {
-          setProfiles(parsed);
-          setCurrentId(parsed[0].id);
-        }
-      } catch (e) {
-        console.error("读取本地档案失败", e);
-      }
-    }
-  }, []);
+/**
+ * 盘面上下文 -> 可复制的提问。
+ *
+ * 这里**没有接任何模型**：这个项目里没有 API route，也没有任何 key。
+ * 所以本组件做的是把盘面事实整理成一段上下文，让你贴到外部模型里去问，
+ * 而不是在前端编一段“AI 解读”出来。要真正接模型，加一个 app/api/chat/route.ts。
+ *
+ * 上下文的字段名跟随界面语言：用英文界面的人要的是英文上下文。
+ * 盘面术语本身（宫位名、星曜名）由 iztro 按 bySolar 的 language 参数输出。
+ */
+function buildContext(
+  profile: Profile,
+  targetDate: string,
+  astrolabeData: IFunctionalAstrolabe | null,
+  horoscope: IFunctionalHoroscope | null,
+  t: T,
+): string {
+  if (!astrolabeData) return t('ctxUnavailable');
 
-  if (!mounted) {
-    return <div className="min-h-screen bg-slate-900 text-slate-100 p-8 flex items-center justify-center">加载中...</div>;
+  const natalPalaceAt = (index?: number) =>
+    typeof index === 'number' ? astrolabeData.palaces[index]?.name ?? '—' : '—';
+
+  const lines: string[] = [
+    `${t('ctxMaster')}：${profile.name}（${profile.gender === 'male' ? t('genderMale') : t('genderFemale')}）`,
+    `${t('ctxSolarDate')}：${profile.solarDate}，${t('ctxTimeIndex')}：${t.hours[profile.timeIndex] ?? profile.timeIndex}`,
+    `${t('ctxLunarDate')}：${astrolabeData.lunarDate}`,
+    `${t('ctxFiveElements')}：${astrolabeData.fiveElementsClass}`,
+    `${t('ctxSoulBranch')}：${astrolabeData.earthlyBranchOfSoulPalace}，${t('ctxBodyBranch')}：${astrolabeData.earthlyBranchOfBodyPalace}`,
+    '',
+    t('ctxPalaces'),
+    ...astrolabeData.palaces.map(
+      (p) =>
+        `  ${p.name}（${p.heavenlyStem}${p.earthlyBranch}）${t('ctxMajorStars')}：${
+          p.majorStars.map((s) => s.name).join('、') || t('ctxNone')
+        }；${t('ctxMinorStars')}：${p.minorStars.map((s) => s.name).join('、') || t('ctxNone')}`,
+    ),
+  ];
+
+  if (horoscope) {
+    lines.push(
+      '',
+      `${t('ctxTargetDate')}：${targetDate}`,
+      `${t('ctxYearly')}：${horoscope.yearly.heavenlyStem}${horoscope.yearly.earthlyBranch}${t('yearSuffix')}，${t('ctxFallsIn')}${natalPalaceAt(horoscope.yearly.index)}`,
+      `${t('ctxMonthly')}：${t('ctxFallsIn')}${natalPalaceAt(horoscope.monthly.index)}`,
+      `${t('ctxDaily')}：${t('ctxFallsIn')}${natalPalaceAt(horoscope.daily.index)}`,
+      `${t('ctxDecadal')}：${t('ctxFallsIn')}${natalPalaceAt(horoscope.decadal.index)}（${t('nominalAge')} ${horoscope.age.nominalAge}）`,
+    );
   }
 
-  const saveProfilesToStorage = (newProfiles: Profile[]) => {
-    setProfiles(newProfiles);
-    localStorage.setItem('yizi_profiles', JSON.stringify(newProfiles));
-  };
+  return lines.join('\n');
+}
 
-  const handleSaveProfile = (profile: Profile, isEditing: boolean) => {
-    if (isEditing) {
-      const updated = profiles.map(p => p.id === profile.id ? profile : p);
-      saveProfilesToStorage(updated);
-      alert('档案修改成功！');
-    } else {
-      const updated = [...profiles, profile];
-      saveProfilesToStorage(updated);
-      setCurrentId(profile.id);
+export default function AiChatBox({
+  currentProfile,
+  targetDate,
+  horoscope,
+  astrolabeData,
+  t,
+}: AiChatBoxProps) {
+  const [question, setQuestion] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const context = buildContext(currentProfile, targetDate, astrolabeData, horoscope, t);
+  const payload = question.trim()
+    ? `${context}\n\n${t('ctxQuestion')}：${question.trim()}`
+    : context;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      console.error(t('copyFailed'), e);
     }
   };
-
-  const handleDeleteProfile = (id: string) => {
-    if (profiles.length <= 1) {
-      alert('至少需要保留一个档案！');
-      return;
-    }
-    if (confirm('确定要删除该档案吗？')) {
-      const updated = profiles.filter(p => p.id !== id);
-      saveProfilesToStorage(updated);
-      setCurrentId(updated[0].id);
-    }
-  };
-
-  const currentProfile = profiles.find(p => p.id === currentId) || profiles[0];
-
-  // 计算排盘与流盘
-  let astrolabeData: any = null;
-  let horoscope: any = null;
-  try {
-    if (astrolabe && typeof astrolabe.bySolar === 'function') {
-      astrolabeData = astrolabe.bySolar(
-        currentProfile.solarDate, 
-        currentProfile.timeIndex, 
-        currentProfile.gender, 
-        true, 
-        'zh-CN'
-      );
-      horoscope = astrolabeData.horoscope(targetDate);
-    }
-  } catch (error) {
-    console.error("排盘计算出错:", error);
-  }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* 顶部标题栏 */}
-        <header className="bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold tracking-wider text-purple-400">Yiii · 易紫</h1>
-            <p className="text-xs text-slate-400">多档案紫微斗数动态流盘与 AI 洞察系统</p>
-          </div>
-        </header>
-
-        {/* 控制面板：档案管理 + 时空流盘切换 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ProfilePanel 
-            profiles={profiles}
-            currentId={currentId}
-            onSelectProfile={setCurrentId}
-            onSaveProfile={handleSaveProfile}
-            onDeleteProfile={handleDeleteProfile}
-          />
-          <HoroscopeBar 
-            targetDate={targetDate}
-            onDateChange={setTargetDate}
-            horoscope={horoscope}
-          />
+    <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-md space-y-3">
+      <div className="flex justify-between items-start gap-4">
+        <div>
+          <h2 className="text-md font-semibold text-purple-300">{t('aiTitle')}</h2>
+          <p className="text-xs text-slate-400">{t('aiSubtitle')}</p>
         </div>
-
-        {/* AI 智能问答组件 */}
-        <AiChatBox 
-          currentProfile={currentProfile}
-          targetDate={targetDate}
-          horoscope={horoscope}
-          astrolabeData={astrolabeData}
-        />
-
-        {/* 十二宫格排盘主界面 */}
-        <AstrolabeGrid 
-          astrolabeData={astrolabeData}
-          currentName={currentProfile.name}
-        />
-
+        <span className="text-[10px] text-amber-400/90 bg-amber-400/10 border border-amber-400/30 px-2 py-1 rounded-lg whitespace-nowrap">
+          {t('notConnected')}
+        </span>
       </div>
+
+      <textarea
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder={t('questionPlaceholder')}
+        rows={2}
+        className="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white placeholder:text-slate-600 resize-none focus:outline-none focus:border-purple-500"
+      />
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!astrolabeData}
+          className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition"
+        >
+          {copied ? t('copied') : t('copyContext')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs text-slate-400 hover:text-slate-200 transition"
+        >
+          {open ? t('hidePayload') : t('showPayload')}
+        </button>
+      </div>
+
+      {open && (
+        <pre className="text-[10px] leading-relaxed text-slate-400 bg-slate-900/70 border border-slate-700/60 p-3 rounded-lg max-h-64 overflow-auto whitespace-pre-wrap">
+          {payload}
+        </pre>
+      )}
     </div>
   );
 }
