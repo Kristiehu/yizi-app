@@ -34,7 +34,9 @@ export default function Home() {
           setCurrentId(parsed[0].id);
         }
       } catch (e) {
-        console.error(t('loadProfilesFailed'), e);
+        // 开发者日志，不随界面语言变化 —— 否则这个 effect 就得依赖 t，
+        // 而它运行时 lang 还没解析出来。
+        console.error('Failed to read saved profiles', e);
       }
     }
   }, []);
@@ -101,7 +103,7 @@ export default function Home() {
     );
     horoscope = astrolabeData.horoscope(targetDate);
   } catch (error) {
-    console.error(t('calcFailed'), error);
+    console.error('Chart calculation failed:', error);
   }
 
   return (

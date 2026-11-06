@@ -43,8 +43,6 @@ const zhCN = {
   alertEditSuccess: '档案修改成功！',
   alertKeepOne: '至少需要保留一个档案！',
   confirmDelete: '确定要删除该档案吗？',
-  loadProfilesFailed: '读取本地档案失败',
-  calcFailed: '排盘计算出错:',
 
   // 流盘
   horoTitle: '⏳ 动态时空切换 (流年/流月/流日)',
@@ -135,8 +133,6 @@ const zhTW: Dict = {
   alertEditSuccess: '檔案修改成功！',
   alertKeepOne: '至少需要保留一個檔案！',
   confirmDelete: '確定要刪除該檔案嗎？',
-  loadProfilesFailed: '讀取本機檔案失敗',
-  calcFailed: '排盤計算出錯:',
 
   horoTitle: '⏳ 動態時空切換 (流年/流月/流日)',
   horoSubtitle: '選擇任意日期，即時推算當下的流盤切片',
@@ -220,8 +216,6 @@ const enUS: Dict = {
   alertEditSuccess: 'Profile updated.',
   alertKeepOne: 'At least one profile must remain.',
   confirmDelete: 'Delete this profile?',
-  loadProfilesFailed: 'Failed to read saved profiles',
-  calcFailed: 'Chart calculation failed:',
 
   horoTitle: '⏳ Transits (yearly / monthly / daily)',
   horoSubtitle: 'Pick any date to recompute the transit slice for that moment',
